@@ -11,14 +11,6 @@
 
 ---
 
-## ☕ Support
-
-Found this useful? A coffee goes a long way ☕
-
-<a href='https://ko-fi.com/P5P21ZQGK2' target='_blank'><img height='72' style='border:0px;height:72px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
-
----
-
 ## ⚡ Why Choose Storage Cleaner?
 
 Unlike commercial cleaner apps that track user data, run battery-draining background daemons, or push intrusive ads, **Storage Cleaner** is designed from the ground up to be:
@@ -105,6 +97,14 @@ cd android-storage-cleaner
 # Run Unit Tests
 ./gradlew testDebugUnitTest
 ```
+
+---
+
+## ☕ Support
+
+Found this useful? A coffee goes a long way ☕
+
+<a href='https://ko-fi.com/P5P21ZQGK2' target='_blank'><img height='60' style='border:0px;height:60px;' src='https://storage.ko-fi.com/cdn/kofi6.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 ---
 
