@@ -1,0 +1,6 @@
+{
+  "name": "Storage Cleaner",
+  "description": "Fast, lightweight Android storage-cleaner app for low-end devices with deep clean, duplicates, similar photos, large files, and app manager.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
