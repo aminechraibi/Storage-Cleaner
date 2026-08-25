@@ -45,30 +45,7 @@ class ExclusionRepository(private val exclusionDao: ExclusionDao) {
     }
 
     fun isExcluded(file: File, activeExclusions: List<Exclusion>): Boolean {
-        if (activeExclusions.isEmpty()) return false
-        val path = file.absolutePath.lowercase(Locale.ROOT)
-        val name = file.name.lowercase(Locale.ROOT)
-        val ext = file.extension.lowercase(Locale.ROOT)
-
-        for (exclusion in activeExclusions) {
-            val pattern = exclusion.pattern.lowercase(Locale.ROOT)
-            when (exclusion.type) {
-                ExclusionType.PATH -> {
-                    if (path.startsWith(pattern) || path == pattern) return true
-                }
-                ExclusionType.FOLDER_NAME -> {
-                    if (path.contains("/$pattern/") || name == pattern) return true
-                }
-                ExclusionType.EXTENSION -> {
-                    val cleanExt = pattern.removePrefix(".")
-                    if (ext == cleanExt) return true
-                }
-                ExclusionType.KEYWORD -> {
-                    if (name.contains(pattern) || path.contains(pattern)) return true
-                }
-            }
-        }
-        return false
+        return com.example.util.FileClassifier.isExcluded(file, activeExclusions)
     }
 }
 

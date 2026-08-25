@@ -105,7 +105,7 @@ class AppRepository(private val context: Context) {
     }
 
     fun getUninstallIntent(packageName: String): Intent {
-        return Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+        return Intent(Intent.ACTION_DELETE).apply {
             data = Uri.parse("package:$packageName")
             putExtra(Intent.EXTRA_RETURN_RESULT, true)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK

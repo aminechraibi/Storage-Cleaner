@@ -1,6 +1,8 @@
 package com.example.util
 
 import com.example.model.CleanCategory
+import com.example.model.Exclusion
+import com.example.model.ExclusionType
 import com.example.model.FileType
 import java.io.File
 import java.util.Locale
@@ -37,16 +39,45 @@ object FileClassifier {
         largeThresholdBytes: Long = 25 * 1024 * 1024L,
         oldThresholdTimestamp: Long = System.currentTimeMillis() - (60L * 24 * 60 * 60 * 1000)
     ): Pair<CleanCategory, FileType> {
-        val path = file.absolutePath.lowercase(Locale.ROOT)
-        val name = file.name.lowercase(Locale.ROOT)
-        val ext = file.extension.lowercase(Locale.ROOT)
-        val size = file.length()
-        val modified = file.lastModified()
+        val path = file.absolutePath
+        val name = file.name
+        val ext = file.extension
+        val size = if (file.exists()) file.length() else 0L
+        val modified = if (file.exists()) file.lastModified() else System.currentTimeMillis()
+        val isDirectory = file.isDirectory
+        val isEmptyDirectory = isDirectory && (file.list()?.isEmpty() == true)
+
+        return classify(
+            path = path,
+            name = name,
+            extension = ext,
+            size = size,
+            lastModified = modified,
+            isDirectory = isDirectory,
+            isEmptyDirectory = isEmptyDirectory,
+            largeThresholdBytes = largeThresholdBytes,
+            oldThresholdTimestamp = oldThresholdTimestamp
+        )
+    }
+
+    fun classify(
+        path: String,
+        name: String,
+        extension: String,
+        size: Long,
+        lastModified: Long = System.currentTimeMillis(),
+        isDirectory: Boolean = false,
+        isEmptyDirectory: Boolean = false,
+        largeThresholdBytes: Long = 25 * 1024 * 1024L,
+        oldThresholdTimestamp: Long = System.currentTimeMillis() - (60L * 24 * 60 * 60 * 1000)
+    ): Pair<CleanCategory, FileType> {
+        val lowerPath = path.lowercase(Locale.ROOT)
+        val lowerName = name.lowercase(Locale.ROOT)
+        val lowerExt = extension.lowercase(Locale.ROOT)
 
         // 1. Check directory
-        if (file.isDirectory) {
-            val children = file.list()
-            return if (children == null || children.isEmpty()) {
+        if (isDirectory) {
+            return if (isEmptyDirectory) {
                 CleanCategory.SAFE_JUNK to FileType.EMPTY_FOLDER
             } else {
                 CleanCategory.REVIEW to FileType.OTHER
@@ -54,36 +85,36 @@ object FileClassifier {
         }
 
         // 2. Safe Junk patterns (Temporary files, residual logs, caches, thumbnails)
-        if (SAFE_EXTENSIONS.contains(ext) ||
-            path.contains("/.thumbnails") ||
-            path.contains("/cache/") ||
-            path.contains("/cache") ||
-            path.contains("/.cache/") ||
-            name.startsWith("cache_") ||
-            name.endsWith(".tmp") ||
-            name.endsWith(".log") ||
-            name.startsWith("thumb_")
+        if (SAFE_EXTENSIONS.contains(lowerExt) ||
+            lowerPath.contains("/.thumbnails") ||
+            lowerPath.contains("/cache/") ||
+            lowerPath.contains("/cache") ||
+            lowerPath.contains("/.cache/") ||
+            lowerName.startsWith("cache_") ||
+            lowerName.endsWith(".tmp") ||
+            lowerName.endsWith(".log") ||
+            lowerName.startsWith("thumb_")
         ) {
             return CleanCategory.SAFE_JUNK to FileType.CACHE
         }
 
         // 3. Residual files from uninstalled apps or temporary folders
-        if (path.contains("/android/data/") && (path.contains("/cache") || path.contains("/temp"))) {
+        if (lowerPath.contains("/android/data/") && (lowerPath.contains("/cache") || lowerPath.contains("/temp"))) {
             return CleanCategory.SAFE_JUNK to FileType.RESIDUAL
         }
 
         // 4. APK Files (Downloaded installer packages)
-        if (ext == "apk") {
+        if (lowerExt == "apk") {
             return CleanCategory.SAFE_JUNK to FileType.APK
         }
 
         // 5. Screenshots & Screen Recordings
-        if (path.contains("/screenshots") || name.startsWith("screenshot") || path.contains("/screenrecorder") || name.startsWith("screen_recording")) {
+        if (lowerPath.contains("/screenshots") || lowerName.startsWith("screenshot") || lowerPath.contains("/screenrecorder") || lowerName.startsWith("screen_recording")) {
             return CleanCategory.REVIEW to FileType.SCREENSHOT
         }
 
         // 6. Downloads folder items
-        if (path.contains("/download/") || path.contains("/downloads/")) {
+        if (lowerPath.contains("/download/") || lowerPath.contains("/downloads/")) {
             return if (size >= largeThresholdBytes) {
                 CleanCategory.REVIEW to FileType.LARGE
             } else {
@@ -97,15 +128,15 @@ object FileClassifier {
         }
 
         // 8. Media Types
-        if (IMAGE_EXTENSIONS.contains(ext)) {
-            return if (modified < oldThresholdTimestamp) {
+        if (IMAGE_EXTENSIONS.contains(lowerExt)) {
+            return if (lastModified < oldThresholdTimestamp) {
                 CleanCategory.REVIEW to FileType.OLD
             } else {
                 CleanCategory.SENSITIVE to FileType.MEDIA_IMAGE
             }
         }
 
-        if (VIDEO_EXTENSIONS.contains(ext)) {
+        if (VIDEO_EXTENSIONS.contains(lowerExt)) {
             return if (size >= largeThresholdBytes) {
                 CleanCategory.REVIEW to FileType.LARGE
             } else {
@@ -113,24 +144,51 @@ object FileClassifier {
             }
         }
 
-        if (AUDIO_EXTENSIONS.contains(ext)) {
+        if (AUDIO_EXTENSIONS.contains(lowerExt)) {
             return CleanCategory.SENSITIVE to FileType.MEDIA_AUDIO
         }
 
-        if (DOCUMENT_EXTENSIONS.contains(ext)) {
+        if (DOCUMENT_EXTENSIONS.contains(lowerExt)) {
             return CleanCategory.SENSITIVE to FileType.DOCUMENT
         }
 
-        if (ARCHIVE_EXTENSIONS.contains(ext)) {
+        if (ARCHIVE_EXTENSIONS.contains(lowerExt)) {
             return CleanCategory.REVIEW to FileType.ARCHIVE
         }
 
         // 9. Old unaccessed files
-        if (modified < oldThresholdTimestamp) {
+        if (lastModified < oldThresholdTimestamp) {
             return CleanCategory.REVIEW to FileType.OLD
         }
 
         return CleanCategory.REVIEW to FileType.OTHER
+    }
+
+    fun isExcluded(file: File, activeExclusions: List<Exclusion>): Boolean {
+        if (activeExclusions.isEmpty()) return false
+        val path = file.absolutePath.lowercase(Locale.ROOT)
+        val name = file.name.lowercase(Locale.ROOT)
+        val ext = file.extension.lowercase(Locale.ROOT)
+
+        for (exclusion in activeExclusions) {
+            val pattern = exclusion.pattern.lowercase(Locale.ROOT)
+            when (exclusion.type) {
+                ExclusionType.PATH -> {
+                    if (path.startsWith(pattern) || path == pattern) return true
+                }
+                ExclusionType.FOLDER_NAME -> {
+                    if (path.contains("/$pattern/") || name == pattern || path.endsWith("/$pattern")) return true
+                }
+                ExclusionType.EXTENSION -> {
+                    val cleanExt = pattern.removePrefix(".")
+                    if (ext == cleanExt) return true
+                }
+                ExclusionType.KEYWORD -> {
+                    if (name.contains(pattern) || path.contains(pattern)) return true
+                }
+            }
+        }
+        return false
     }
 
     fun getMimeType(extension: String): String {

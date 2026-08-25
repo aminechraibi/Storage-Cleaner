@@ -81,10 +81,15 @@ class TopKMinHeap<T>(
         items.forEach { add(it) }
     }
 
+    fun toList(): List<T> = toSortedList()
+
     fun toSortedList(): List<T> {
         val list = ArrayList<T>(minHeap.size)
         while (minHeap.isNotEmpty()) {
-            list.add(minHeap.poll())
+            val item = minHeap.poll()
+            if (item != null) {
+                list.add(item)
+            }
         }
         // Reverse so largest elements are first
         list.reverse()

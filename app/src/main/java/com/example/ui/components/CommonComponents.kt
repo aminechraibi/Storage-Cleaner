@@ -27,7 +27,7 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -539,7 +539,7 @@ fun ItemIconOrThumbnail(item: StorageItem) {
             FileType.DOCUMENT -> Icons.Default.Description to AmberReview
             FileType.ARCHIVE -> Icons.Default.Archive to AmberReview
             FileType.EMPTY_FOLDER, FileType.RESIDUAL -> Icons.Default.Folder to EmeraldSafe
-            else -> Icons.Default.InsertDriveFile to MaterialTheme.colorScheme.onSurfaceVariant
+            else -> androidx.compose.material.icons.Icons.AutoMirrored.Filled.InsertDriveFile to MaterialTheme.colorScheme.onSurfaceVariant
         }
 
         Box(

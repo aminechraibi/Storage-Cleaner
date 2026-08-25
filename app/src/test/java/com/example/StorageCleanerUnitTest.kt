@@ -25,35 +25,57 @@ class StorageCleanerUnitTest {
 
     @Test
     fun testFileClassifierSafeJunk() {
-        val apkFile = File("/storage/emulated/0/Download/test.apk")
-        val apkItem = FileClassifier.classify(apkFile, size = 15_000_000, mimeType = "application/vnd.android.package-archive")
-        assertEquals(CleanCategory.SAFE_JUNK, apkItem.category)
-        assertEquals(FileType.APK, apkItem.type)
+        val (apkCategory, apkType) = FileClassifier.classify(
+            path = "/storage/emulated/0/Download/test.apk",
+            name = "test.apk",
+            extension = "apk",
+            size = 15_000_000L
+        )
+        assertEquals(CleanCategory.SAFE_JUNK, apkCategory)
+        assertEquals(FileType.APK, apkType)
 
-        val logFile = File("/storage/emulated/0/Android/data/app/cache/app.log")
-        val logItem = FileClassifier.classify(logFile, size = 500, mimeType = "text/plain")
-        assertEquals(CleanCategory.SAFE_JUNK, logItem.category)
+        val (logCategory, logType) = FileClassifier.classify(
+            path = "/storage/emulated/0/Android/data/app/cache/app.log",
+            name = "app.log",
+            extension = "log",
+            size = 500L
+        )
+        assertEquals(CleanCategory.SAFE_JUNK, logCategory)
+        assertEquals(FileType.CACHE, logType)
     }
 
     @Test
     fun testFileClassifierSensitive() {
-        val dcimPhoto = File("/storage/emulated/0/DCIM/Camera/IMG_20260823.jpg")
-        val photoItem = FileClassifier.classify(dcimPhoto, size = 3_500_000, mimeType = "image/jpeg")
-        assertEquals(CleanCategory.SENSITIVE, photoItem.category)
-        assertEquals(FileType.MEDIA_IMAGE, photoItem.type)
+        val (photoCategory, photoType) = FileClassifier.classify(
+            path = "/storage/emulated/0/DCIM/Camera/IMG_20260823.jpg",
+            name = "IMG_20260823.jpg",
+            extension = "jpg",
+            size = 3_500_000L,
+            lastModified = System.currentTimeMillis()
+        )
+        assertEquals(CleanCategory.SENSITIVE, photoCategory)
+        assertEquals(FileType.MEDIA_IMAGE, photoType)
 
-        val docFile = File("/storage/emulated/0/Documents/tax_return.pdf")
-        val docItem = FileClassifier.classify(docFile, size = 1_200_000, mimeType = "application/pdf")
-        assertEquals(CleanCategory.SENSITIVE, docItem.category)
-        assertEquals(FileType.DOCUMENT, docItem.type)
+        val (docCategory, docType) = FileClassifier.classify(
+            path = "/storage/emulated/0/Documents/tax_return.pdf",
+            name = "tax_return.pdf",
+            extension = "pdf",
+            size = 1_200_000L
+        )
+        assertEquals(CleanCategory.SENSITIVE, docCategory)
+        assertEquals(FileType.DOCUMENT, docType)
     }
 
     @Test
     fun testFileClassifierReview() {
-        val downloadedDoc = File("/storage/emulated/0/Download/report.zip")
-        val downloadItem = FileClassifier.classify(downloadedDoc, size = 4_000_000, mimeType = "application/zip")
-        assertEquals(CleanCategory.REVIEW, downloadItem.category)
-        assertEquals(FileType.ARCHIVE, downloadItem.type)
+        val (archiveCategory, archiveType) = FileClassifier.classify(
+            path = "/storage/emulated/0/Other/report.zip",
+            name = "report.zip",
+            extension = "zip",
+            size = 4_000_000L
+        )
+        assertEquals(CleanCategory.REVIEW, archiveCategory)
+        assertEquals(FileType.ARCHIVE, archiveType)
     }
 
     @Test
@@ -96,7 +118,7 @@ class StorageCleanerUnitTest {
 
     @Test
     fun testTopKMinHeap() {
-        val heap = TopKMinHeap(3)
+        val heap = TopKMinHeap<StorageItem>(3, compareBy { it.size })
         heap.add(StorageItem(id = 1, path = "/a", name = "a", size = 100L, lastModified = 0L))
         heap.add(StorageItem(id = 2, path = "/b", name = "b", size = 500L, lastModified = 0L))
         heap.add(StorageItem(id = 3, path = "/c", name = "c", size = 300L, lastModified = 0L))
@@ -113,8 +135,8 @@ class StorageCleanerUnitTest {
     @Test
     fun testStorageFormatting() {
         assertEquals("0 B", StorageUtils.formatBytes(0L))
-        assertEquals("1.00 KB", StorageUtils.formatBytes(1024L))
-        assertEquals("1.50 MB", StorageUtils.formatBytes((1.5 * 1024 * 1024).toLong()))
-        assertEquals("2.00 GB", StorageUtils.formatBytes(2L * 1024 * 1024 * 1024))
+        assertEquals("1 KB", StorageUtils.formatBytes(1024L))
+        assertEquals("1.5 MB", StorageUtils.formatBytes((1.5 * 1024 * 1024).toLong()))
+        assertEquals("2 GB", StorageUtils.formatBytes(2L * 1024 * 1024 * 1024))
     }
 }

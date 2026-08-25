@@ -43,7 +43,7 @@ abstract class CleanerDatabase : RoomDatabase() {
                     CleanerDatabase::class.java,
                     "storage_cleaner.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

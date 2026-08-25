@@ -331,7 +331,7 @@ fun AppManagerScreen(
                         },
                         onUninstall = {
                             try {
-                                val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+                                val intent = Intent(Intent.ACTION_DELETE).apply {
                                     data = Uri.parse("package:${appInfo.packageName}")
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                 }
