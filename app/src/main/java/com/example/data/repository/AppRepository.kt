@@ -48,11 +48,30 @@ class AppRepository(private val context: Context) {
             if (storageStatsManager != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 try {
                     val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
-                    val uuid = storageManager?.getUuidForPath(File(app.sourceDir)) ?: StorageManager.UUID_DEFAULT
-                    val stats = storageStatsManager.queryStatsForPackage(uuid, app.packageName, Process.myUserHandle())
+                    val uuid = try {
+                        app.storageUuid ?: StorageManager.UUID_DEFAULT
+                    } catch (e: Throwable) {
+                        try {
+                            storageManager?.getUuidForPath(File(app.sourceDir)) ?: StorageManager.UUID_DEFAULT
+                        } catch (e2: Throwable) {
+                            StorageManager.UUID_DEFAULT
+                        }
+                    }
+
+                    val stats = try {
+                        storageStatsManager.queryStatsForPackage(uuid, app.packageName, Process.myUserHandle())
+                    } catch (e: Exception) {
+                        if (uuid != StorageManager.UUID_DEFAULT) {
+                            storageStatsManager.queryStatsForPackage(StorageManager.UUID_DEFAULT, app.packageName, Process.myUserHandle())
+                        } else {
+                            throw e
+                        }
+                    }
+
                     codeSize = stats.appBytes
-                    dataSize = stats.dataBytes
                     cacheSize = stats.cacheBytes
+                    val rawData = stats.dataBytes
+                    dataSize = (rawData - cacheSize).coerceAtLeast(0L)
                     statsRetrieved = true
                 } catch (e: Exception) {
                     statsRetrieved = false
@@ -64,12 +83,33 @@ class AppRepository(private val context: Context) {
                 val apkFile = File(app.sourceDir)
                 if (apkFile.exists()) {
                     codeSize = apkFile.length()
+                } else if (!app.publicSourceDir.isNullOrEmpty()) {
+                    val publicApk = File(app.publicSourceDir)
+                    if (publicApk.exists()) {
+                        codeSize = publicApk.length()
+                    }
                 }
-                // Estimate app external cache directory if available
-                val externalCache = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, app.packageName + "/cache")
-                if (externalCache.exists()) {
-                    cacheSize = getFolderSize(externalCache)
+                // Estimate app external cache directory if accessible
+                try {
+                    val externalCache = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, "${app.packageName}/cache")
+                    if (externalCache.exists()) {
+                        cacheSize = getFolderSize(externalCache)
+                    }
+                } catch (e: Exception) {
+                    // Restricted on newer Android without root
                 }
+            }
+
+            val installTime = try {
+                val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    pm.getPackageInfo(app.packageName, PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    pm.getPackageInfo(app.packageName, 0)
+                }
+                packageInfo.firstInstallTime
+            } catch (e: Exception) {
+                0L
             }
 
             val totalSize = codeSize + dataSize + cacheSize
@@ -83,7 +123,8 @@ class AppRepository(private val context: Context) {
                     cacheSize = cacheSize,
                     totalSize = totalSize,
                     isSystemApp = isSystem,
-                    isProtected = isSystem || app.packageName == context.packageName
+                    isProtected = isSystem || app.packageName == context.packageName,
+                    installTime = installTime
                 )
             )
         }

@@ -77,8 +77,16 @@ data class AppStorageInfo(
     val isSystemApp: Boolean = false,
     val isProtected: Boolean = false,
     val lastUsedTime: Long = 0L,
+    val installTime: Long = 0L,
     val isSelected: Boolean = false
 )
+
+enum class AppSortField {
+    SIZE,
+    INSTALL_TIME,
+    NAME
+}
+
 
 data class DuplicateGroup(
     val hash: String,

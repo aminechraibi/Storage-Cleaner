@@ -19,14 +19,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Coffee
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,7 +47,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,12 +59,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.theme.AmberWarning
 import com.example.ui.theme.CyanPrimary
 import com.example.ui.theme.EmeraldSafe
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.Screen
+import com.example.util.PermissionUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,11 +77,27 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     val recycleBinEnabled by viewModel.recycleBinEnabled.collectAsStateWithLifecycle()
     val largeFileMb by viewModel.largeFileThresholdMb.collectAsStateWithLifecycle()
     val oldFileDays by viewModel.oldFileThresholdDays.collectAsStateWithLifecycle()
     val lowEndMode by viewModel.lowEndMode.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+
+    var hasUsageStats by remember { mutableStateOf(PermissionUtils.hasUsageStatsPermission(context)) }
+    var hasStorageAccess by remember { mutableStateOf(PermissionUtils.hasAllFilesAccess(context)) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasUsageStats = PermissionUtils.hasUsageStatsPermission(context)
+                hasStorageAccess = PermissionUtils.hasAllFilesAccess(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         topBar = {
@@ -107,6 +134,66 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(top = 10.dp, bottom = 40.dp)
         ) {
+            // System Permissions & Access Card
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("card_system_permissions"),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.AdminPanelSettings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "System Permissions & Access",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "Check and enable required system privileges to view app cache sizes and clean deep storage.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Usage Access Permission Row
+                        PermissionStatusRow(
+                            title = "Usage Access (App Cache & Storage)",
+                            description = "Required by Android StorageStatsManager to measure third-party app cache & data. Without this permission, app cache shows as 0 B.",
+                            isGranted = hasUsageStats,
+                            buttonText = if (hasUsageStats) "Settings" else "Enable Usage Access",
+                            testTag = "btn_permission_usage_stats",
+                            onAction = { PermissionUtils.openUsageAccessSettings(context) }
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Storage / All Files Access Permission Row
+                        PermissionStatusRow(
+                            title = "All Files Storage Access",
+                            description = "Allows full scanning and safe cleanup of duplicate files, residual folders, and APKs across internal storage.",
+                            isGranted = hasStorageAccess,
+                            buttonText = if (hasStorageAccess) "Settings" else "Enable Storage Access",
+                            testTag = "btn_permission_storage",
+                            onAction = { PermissionUtils.openAllFilesAccessSettings(context) }
+                        )
+                    }
+                }
+            }
+
             // Theme Mode Card (Light, Dark, System)
             item {
                 Card(
@@ -433,7 +520,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.OpenInNew,
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(14.dp)
@@ -474,7 +561,7 @@ fun SettingsScreen(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Version: 1.0.0 (Build 1)",
+                            text = "Version: 1.1.0 (Build 2)",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -530,4 +617,84 @@ fun SettingsScreen(
     }
 }
 
+@Composable
+fun PermissionStatusRow(
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    buttonText: String,
+    testTag: String,
+    onAction: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (isGranted) EmeraldSafe.copy(alpha = 0.08f) else AmberWarning.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, if (isGranted) EmeraldSafe.copy(alpha = 0.3f) else AmberWarning.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = if (isGranted) Icons.Default.Check else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isGranted) EmeraldSafe else AmberWarning,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isGranted) EmeraldSafe else AmberWarning
+                ) {
+                    Text(
+                        text = if (isGranted) "Granted" else "Action Needed",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onAction,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isGranted) MaterialTheme.colorScheme.primaryContainer else AmberWarning,
+                    contentColor = if (isGranted) MaterialTheme.colorScheme.onPrimaryContainer else Color.White
+                ),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.testTag(testTag)
+            ) {
+                Text(
+                    text = buttonText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}

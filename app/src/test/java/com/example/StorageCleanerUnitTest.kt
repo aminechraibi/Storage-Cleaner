@@ -139,4 +139,97 @@ class StorageCleanerUnitTest {
         assertEquals("1.5 MB", StorageUtils.formatBytes((1.5 * 1024 * 1024).toLong()))
         assertEquals("2 GB", StorageUtils.formatBytes(2L * 1024 * 1024 * 1024))
     }
+
+    @Test
+    fun testAppSortingBySizeDescAndAsc() {
+        val app1 = com.example.model.AppStorageInfo(packageName = "com.a", appName = "Alpha", totalSize = 1000L)
+        val app2 = com.example.model.AppStorageInfo(packageName = "com.b", appName = "Beta", totalSize = 5000L)
+        val app3 = com.example.model.AppStorageInfo(packageName = "com.c", appName = "Gamma", totalSize = 2500L)
+        val list = listOf(app1, app2, app3)
+
+        val desc = list.sortedByDescending { it.totalSize }
+        assertEquals("com.b", desc[0].packageName)
+        assertEquals("com.c", desc[1].packageName)
+        assertEquals("com.a", desc[2].packageName)
+
+        val asc = list.sortedBy { it.totalSize }
+        assertEquals("com.a", asc[0].packageName)
+        assertEquals("com.c", asc[1].packageName)
+        assertEquals("com.b", asc[2].packageName)
+    }
+
+    @Test
+    fun testAppSortingByInstallTimeDescAndAsc() {
+        val app1 = com.example.model.AppStorageInfo(packageName = "com.a", appName = "OldApp", installTime = 100000L)
+        val app2 = com.example.model.AppStorageInfo(packageName = "com.b", appName = "NewestApp", installTime = 500000L)
+        val app3 = com.example.model.AppStorageInfo(packageName = "com.c", appName = "MidApp", installTime = 300000L)
+        val list = listOf(app1, app2, app3)
+
+        val newestFirst = list.sortedByDescending { it.installTime }
+        assertEquals("com.b", newestFirst[0].packageName)
+        assertEquals("com.c", newestFirst[1].packageName)
+        assertEquals("com.a", newestFirst[2].packageName)
+
+        val oldestFirst = list.sortedBy { it.installTime }
+        assertEquals("com.a", oldestFirst[0].packageName)
+        assertEquals("com.c", oldestFirst[1].packageName)
+        assertEquals("com.b", oldestFirst[2].packageName)
+    }
+
+    @Test
+    fun testAppSortingByNameDescAndAsc() {
+        val app1 = com.example.model.AppStorageInfo(packageName = "com.z", appName = "Zebra")
+        val app2 = com.example.model.AppStorageInfo(packageName = "com.a", appName = "Ant")
+        val app3 = com.example.model.AppStorageInfo(packageName = "com.m", appName = "Monkey")
+        val list = listOf(app1, app2, app3)
+
+        val asc = list.sortedBy { it.appName.lowercase() }
+        assertEquals("Ant", asc[0].appName)
+        assertEquals("Monkey", asc[1].appName)
+        assertEquals("Zebra", asc[2].appName)
+
+        val desc = list.sortedByDescending { it.appName.lowercase() }
+        assertEquals("Zebra", desc[0].appName)
+        assertEquals("Monkey", desc[1].appName)
+        assertEquals("Ant", desc[2].appName)
+    }
+
+    @Test
+    fun testAppSearchFiltering() {
+        val apps = listOf(
+            com.example.model.AppStorageInfo(packageName = "com.whatsapp", appName = "WhatsApp"),
+            com.example.model.AppStorageInfo(packageName = "org.telegram.messenger", appName = "Telegram"),
+            com.example.model.AppStorageInfo(packageName = "com.google.android.youtube", appName = "YouTube")
+        )
+
+        val query1 = "tele"
+        val filtered1 = apps.filter { it.appName.lowercase().contains(query1) || it.packageName.lowercase().contains(query1) }
+        assertEquals(1, filtered1.size)
+        assertEquals("Telegram", filtered1[0].appName)
+
+        val query2 = "google"
+        val filtered2 = apps.filter { it.appName.lowercase().contains(query2) || it.packageName.lowercase().contains(query2) }
+        assertEquals(1, filtered2.size)
+        assertEquals("YouTube", filtered2[0].appName)
+
+        val queryEmpty = ""
+        val filteredEmpty = apps.filter { queryEmpty.isBlank() || it.appName.lowercase().contains(queryEmpty) }
+        assertEquals(3, filteredEmpty.size)
+    }
+
+    @Test
+    fun testSafeJunkExcludesZeroByteFilesAndDirectories() {
+        val items = listOf(
+            StorageItem(id = 1, path = "/a/cache.tmp", name = "cache.tmp", size = 15000L, lastModified = 0L, isDirectory = false),
+            StorageItem(id = 2, path = "/a/empty.log", name = "empty.log", size = 0L, lastModified = 0L, isDirectory = false),
+            StorageItem(id = 3, path = "/a/empty_dir", name = "empty_dir", size = 0L, lastModified = 0L, isDirectory = true),
+            StorageItem(id = 4, path = "/b/crash.dmp", name = "crash.dmp", size = 45000L, lastModified = 0L, isDirectory = false)
+        )
+
+        val filteredSafeJunk = items.filter { !it.isDirectory && it.size > 0L }.sortedByDescending { it.size }
+        assertEquals(2, filteredSafeJunk.size)
+        assertEquals(45000L, filteredSafeJunk[0].size)
+        assertEquals(15000L, filteredSafeJunk[1].size)
+    }
 }
+

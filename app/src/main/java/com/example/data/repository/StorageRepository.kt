@@ -97,30 +97,31 @@ class StorageRepository(
             if (current.isDirectory) {
                 val children = try {
                     current.listFiles()
-                } catch (e: SecurityException) {
+                } catch (e: Exception) {
                     null
                 }
 
-                if (children == null || children.isEmpty()) {
-                    // Empty folder detection
-                    val (cat, type) = CleanCategory.SAFE_JUNK to FileType.EMPTY_FOLDER
-                    val entity = FileEntity(
-                        uri = Uri.fromFile(current).toString(),
-                        path = current.absolutePath,
-                        name = current.name,
-                        size = 0L,
-                        lastModified = current.lastModified(),
-                        mimeType = "",
-                        extension = "",
-                        category = cat.name,
-                        fileType = type.name,
-                        isDirectory = true,
-                        itemCount = 0
-                    )
-                    batch.add(entity)
-                } else {
-                    for (child in children) {
-                        queue.add(child)
+                if (children != null) {
+                    if (children.isEmpty()) {
+                        // Truly empty folder detection - categorize under REVIEW/EMPTY_FOLDER for Residual screen
+                        val entity = FileEntity(
+                            uri = Uri.fromFile(current).toString(),
+                            path = current.absolutePath,
+                            name = current.name,
+                            size = 0L,
+                            lastModified = current.lastModified(),
+                            mimeType = "",
+                            extension = "",
+                            category = CleanCategory.REVIEW.name,
+                            fileType = FileType.EMPTY_FOLDER.name,
+                            isDirectory = true,
+                            itemCount = 0
+                        )
+                        batch.add(entity)
+                    } else {
+                        for (child in children) {
+                            queue.add(child)
+                        }
                     }
                 }
             } else if (current.isFile) {
@@ -336,7 +337,12 @@ class StorageRepository(
     }
 
     suspend fun getFilesByCategory(category: CleanCategory): List<StorageItem> = withContext(Dispatchers.IO) {
-        fileDao.getFilesByCategory(category.name).map { it.toModel() }
+        val list = fileDao.getFilesByCategory(category.name).map { it.toModel() }
+        if (category == CleanCategory.SAFE_JUNK) {
+            list.filter { !it.isDirectory && it.size > 0L }.sortedByDescending { it.size }
+        } else {
+            list.sortedByDescending { it.size }
+        }
     }
 
     suspend fun getFilesByType(fileType: FileType): List<StorageItem> = withContext(Dispatchers.IO) {
