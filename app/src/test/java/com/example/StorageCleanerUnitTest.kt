@@ -231,5 +231,87 @@ class StorageCleanerUnitTest {
         assertEquals(45000L, filteredSafeJunk[0].size)
         assertEquals(15000L, filteredSafeJunk[1].size)
     }
+
+    @Test
+    fun testSelectedAppsCacheAndDataAggregation() {
+        val app1 = com.example.model.AppStorageInfo(
+            packageName = "com.app.one",
+            appName = "App One",
+            codeSize = 50_000_000L,
+            dataSize = 20_000_000L,
+            cacheSize = 10_000_000L,
+            totalSize = 80_000_000L
+        )
+        val app2 = com.example.model.AppStorageInfo(
+            packageName = "com.app.two",
+            appName = "App Two",
+            codeSize = 30_000_000L,
+            dataSize = 15_000_000L,
+            cacheSize = 5_000_000L,
+            totalSize = 50_000_000L
+        )
+        val selectedApps = listOf(app1, app2)
+
+        val totalCache = selectedApps.sumOf { it.cacheSize }
+        val totalData = selectedApps.sumOf { it.dataSize }
+        val totalSpace = selectedApps.sumOf { it.totalSize }
+
+        assertEquals(15_000_000L, totalCache)
+        assertEquals(35_000_000L, totalData)
+        assertEquals(130_000_000L, totalSpace)
+    }
+
+    @Test
+    fun testDuplicateGroupsSortingByWastedBytes() {
+        val group1 = com.example.model.DuplicateGroup(
+            hash = "hash1",
+            singleSize = 2_000_000L,
+            wastedBytes = 4_000_000L,
+            items = emptyList()
+        )
+        val group2 = com.example.model.DuplicateGroup(
+            hash = "hash2",
+            singleSize = 10_000_000L,
+            wastedBytes = 20_000_000L,
+            items = emptyList()
+        )
+        val group3 = com.example.model.DuplicateGroup(
+            hash = "hash3",
+            singleSize = 500_000L,
+            wastedBytes = 1_000_000L,
+            items = emptyList()
+        )
+
+        val groups = listOf(group1, group2, group3)
+        val sortedDesc = groups.sortedByDescending { it.wastedBytes }
+        assertEquals("hash2", sortedDesc[0].hash)
+        assertEquals("hash1", sortedDesc[1].hash)
+        assertEquals("hash3", sortedDesc[2].hash)
+
+        val sortedAsc = groups.sortedBy { it.wastedBytes }
+        assertEquals("hash3", sortedAsc[0].hash)
+        assertEquals("hash1", sortedAsc[1].hash)
+        assertEquals("hash2", sortedAsc[2].hash)
+    }
+
+    @Test
+    fun testAppSelectionToggles() {
+        val selected = mutableSetOf<String>()
+
+        fun toggle(pkg: String) {
+            if (selected.contains(pkg)) selected.remove(pkg) else selected.add(pkg)
+        }
+
+        toggle("com.test.a")
+        assertTrue(selected.contains("com.test.a"))
+
+        toggle("com.test.b")
+        assertEquals(2, selected.size)
+
+        toggle("com.test.a")
+        assertFalse(selected.contains("com.test.a"))
+        assertEquals(1, selected.size)
+        assertTrue(selected.contains("com.test.b"))
+    }
 }
 

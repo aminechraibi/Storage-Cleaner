@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.CleanerApplication
 import com.example.domain.usecase.ClearAppCacheUseCase
+import com.example.domain.usecase.ClearAppDataUseCase
 import com.example.domain.usecase.ExclusionUseCases
 import com.example.domain.usecase.FindDuplicatesUseCase
 import com.example.domain.usecase.FindLargeFilesUseCase
@@ -71,6 +72,7 @@ class MainViewModel(
     private val findResidualAndEmptyFoldersUseCase: FindResidualAndEmptyFoldersUseCase,
     private val scanAppsUseCase: ScanAppsUseCase,
     private val clearAppCacheUseCase: ClearAppCacheUseCase,
+    private val clearAppDataUseCase: ClearAppDataUseCase,
     private val performCleanupUseCase: PerformCleanupUseCase,
     private val searchFilesUseCase: SearchFilesUseCase,
     private val recycleBinUseCases: RecycleBinUseCases,
@@ -356,6 +358,38 @@ class MainViewModel(
         clearCacheForApps(listOf(appInfo))
     }
 
+    fun clearDataForApps(appsToClean: List<AppStorageInfo>) {
+        if (appsToClean.isEmpty()) return
+        viewModelScope.launch {
+            val totalDataToFree = appsToClean.sumOf { it.dataSize }
+            val pkgs = appsToClean.map { it.packageName }
+            val freedBytes = clearAppDataUseCase.clearMultiple(pkgs)
+            val effectiveFreed = if (freedBytes > 0L) freedBytes else totalDataToFree
+
+            historyUseCases.recordCleanup(
+                bytesFreed = effectiveFreed,
+                itemCount = appsToClean.size,
+                categorySummary = "App Data Cleaned (${appsToClean.size} apps)"
+            )
+
+            _lastCleanupResult.value = CleanupResult(
+                freedBytes = effectiveFreed,
+                itemsDeleted = appsToClean.size,
+                failedCount = 0,
+                beforeFreeBytes = _storageStats.value.freeBytes,
+                afterFreeBytes = _storageStats.value.freeBytes + effectiveFreed
+            )
+
+            _selectedAppPackages.value = emptySet()
+            _installedApps.value = scanAppsUseCase()
+            refreshStorageStats()
+        }
+    }
+
+    fun clearDataForSingleApp(appInfo: AppStorageInfo) {
+        clearDataForApps(listOf(appInfo))
+    }
+
     fun toggleItemSelection(item: StorageItem) {
         val current = _selectedItemIds.value.toMutableSet()
         if (current.contains(item.id)) {
@@ -547,6 +581,7 @@ class MainViewModel(
                 findResidualAndEmptyFoldersUseCase = FindResidualAndEmptyFoldersUseCase(storageRepo),
                 scanAppsUseCase = ScanAppsUseCase(appRepo),
                 clearAppCacheUseCase = ClearAppCacheUseCase(appRepo),
+                clearAppDataUseCase = ClearAppDataUseCase(appRepo),
                 performCleanupUseCase = PerformCleanupUseCase(storageRepo, settingsDs),
                 searchFilesUseCase = SearchFilesUseCase(storageRepo),
                 recycleBinUseCases = RecycleBinUseCases(recycleRepo),

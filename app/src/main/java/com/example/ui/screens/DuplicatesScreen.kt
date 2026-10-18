@@ -1,5 +1,8 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,9 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
@@ -25,6 +32,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +46,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,6 +66,7 @@ import com.example.ui.theme.RoseSensitive
 import com.example.ui.viewmodel.MainViewModel
 import com.example.ui.viewmodel.Screen
 import com.example.util.StorageUtils
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,12 +74,38 @@ fun DuplicatesScreen(
     viewModel: MainViewModel,
     modifier: Modifier = Modifier
 ) {
-    val duplicateGroups by viewModel.duplicateGroups.collectAsStateWithLifecycle()
+    val rawDuplicateGroups by viewModel.duplicateGroups.collectAsStateWithLifecycle()
     val selectedIds by viewModel.selectedItemIds.collectAsStateWithLifecycle()
+    val coroutineScope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    var sortDescending by remember { mutableStateOf(true) }
+
+    val duplicateGroups = remember(rawDuplicateGroups, sortDescending) {
+        if (sortDescending) rawDuplicateGroups.sortedByDescending { it.wastedBytes }
+        else rawDuplicateGroups.sortedBy { it.wastedBytes }
+    }
 
     val allDuplicateItems = duplicateGroups.flatMap { it.items }
     val selectedItems = allDuplicateItems.filter { selectedIds.contains(it.id) }
     val totalWasted = duplicateGroups.sumOf { it.wastedBytes }
+
+    val showScrollToBottom by remember {
+        derivedStateOf {
+            val total = duplicateGroups.size
+            if (total <= 3) false
+            else {
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                lastVisible < total - 2
+            }
+        }
+    }
+
+    val showScrollToTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 2
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -93,6 +136,24 @@ fun DuplicatesScreen(
                     }
                 },
                 actions = {
+                    FilterChip(
+                        selected = true,
+                        onClick = { sortDescending = !sortDescending },
+                        label = {
+                            Text(
+                                text = if (sortDescending) "Space ↓" else "Space ↑",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .testTag("duplicates_sort_space_btn")
+                    )
                     TextButton(
                         onClick = { viewModel.autoSelectDuplicates(keepNewest = false) },
                         modifier = Modifier.testTag("auto_select_duplicates_button")
@@ -108,6 +169,68 @@ fun DuplicatesScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        floatingActionButton = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.End
+            ) {
+                AnimatedVisibility(
+                    visible = showScrollToTop,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                listState.animateScrollToItem(0)
+                            }
+                        },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("duplicates_scroll_to_top"),
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        elevation = FloatingActionButtonDefaults.elevation(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowUpward,
+                            contentDescription = "Scroll to top",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showScrollToBottom,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                if (duplicateGroups.isNotEmpty()) {
+                                    listState.animateScrollToItem(duplicateGroups.size - 1)
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("duplicates_scroll_to_bottom"),
+                        shape = CircleShape,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        elevation = FloatingActionButtonDefaults.elevation(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDownward,
+                            contentDescription = "Fast scroll to bottom",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         },
         bottomBar = {
             if (selectedItems.isNotEmpty()) {
@@ -193,6 +316,7 @@ fun DuplicatesScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = modifier
                     .fillMaxSize()
                     .padding(innerPadding)

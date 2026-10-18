@@ -467,13 +467,14 @@ jobs:
             **Version:** `${{ env.VERSION_NAME }}`
             **Version Code:** `${{ env.VERSION_CODE }}`
 
-            ### 🚀 Highlights (v1.1)
-            - **Accurate App & Cache Manager**: Integrated StorageStatsManager with PACKAGE_USAGE_STATS permission helper for exact third-party app cache & data measurements.
-            - **App Search & Advanced Sorting**: Instant app search by name/package and dual-direction (ASC & DESC) sorting by Space (Total/Cache), Install Time, and Name.
-            - **System Permissions Center**: Dedicated in-app permission status cards in Settings and App Manager with one-click system settings navigation.
-            - **Fast Scroll Jump Controls**: Quick jump buttons to instantly scroll to bottom and top of extensive file and application lists.
-            - **Refined Quick Clean**: Filtered out 0-byte items from Safe Junk so only space-saving files are prioritized.
-            - **Deep Storage Cleaner**: Exact duplicate finder, dHash photo clustering, memory-bounded large file analyzer, and Room-backed exclusions whitelist.
+            ### 🚀 Highlights (v1.2)
+            - **Clear Cache of Selected & Single Apps**: One-tap cache cleaning for individual apps or batch selection, backed by explicit confirmation dialogs.
+            - **Clear Data of Selected & Single Apps**: Safe data reset with dedicated warning confirmation dialogs and direct system settings integration.
+            - **Zero 0-Byte Items in Quick Scan**: Excluded inaccessible and 0-byte items from Safe Junk scanning to ensure only meaningful cleanable space is presented.
+            - **Universal Sorting by Space**: Sort files and apps by space (ascending/descending), install time, and name across App Manager, Duplicates, and Results.
+            - **Fast Scroll Jump Controls**: Quick jump buttons to instantly scroll to bottom and top of extensive lists.
+            - **App Search & Permissions Center**: Live app name/package search, Usage Access status monitoring, and one-click settings access.
+            - **Thorough Unit & Robolectric Tests**: Expanded automated test coverage for sorting, filtering, cache/data calculations, and confirmation workflows.
 
             ### 📲 Installation Instructions
 

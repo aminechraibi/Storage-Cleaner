@@ -181,6 +181,35 @@ class AppRepository(private val context: Context) {
         totalFreed
     }
 
+    suspend fun clearAppData(packageName: String): Long = withContext(Dispatchers.IO) {
+        var freedBytes = 0L
+        if (packageName == context.packageName) {
+            freedBytes += deleteDirContents(context.filesDir)
+            freedBytes += deleteDirContents(context.cacheDir)
+            freedBytes += deleteDirContents(context.codeCacheDir)
+            context.externalCacheDir?.let { freedBytes += deleteDirContents(it) }
+            context.getExternalFilesDir(null)?.let { freedBytes += deleteDirContents(it) }
+        } else {
+            try {
+                val externalDir = File(context.getExternalFilesDir(null)?.parentFile?.parentFile, packageName)
+                if (externalDir.exists()) {
+                    freedBytes += deleteDirContents(externalDir)
+                }
+            } catch (e: Exception) {
+                // Restricted on Android 11+
+            }
+        }
+        freedBytes
+    }
+
+    suspend fun clearMultipleAppsData(packageNames: List<String>): Long = withContext(Dispatchers.IO) {
+        var totalFreed = 0L
+        for (pkg in packageNames) {
+            totalFreed += clearAppData(pkg)
+        }
+        totalFreed
+    }
+
     private fun deleteDirContents(dir: File?): Long {
         if (dir == null || !dir.exists()) return 0L
         var deletedBytes = 0L

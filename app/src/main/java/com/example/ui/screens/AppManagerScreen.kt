@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -93,6 +94,13 @@ import com.example.util.PermissionUtils
 import com.example.util.StorageUtils
 import kotlinx.coroutines.launch
 
+sealed class AppClearConfirmation {
+    data class ClearCacheSingle(val app: AppStorageInfo) : AppClearConfirmation()
+    data class ClearDataSingle(val app: AppStorageInfo) : AppClearConfirmation()
+    data class ClearCacheSelected(val apps: List<AppStorageInfo>) : AppClearConfirmation()
+    data class ClearDataSelected(val apps: List<AppStorageInfo>) : AppClearConfirmation()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppManagerScreen(
@@ -111,6 +119,7 @@ fun AppManagerScreen(
     var searchQuery by remember { mutableStateOf("") }
     var sortField by remember { mutableStateOf(AppSortField.SIZE) }
     var sortDescending by remember { mutableStateOf(true) }
+    var confirmationDialog by remember { mutableStateOf<AppClearConfirmation?>(null) }
 
     // Dynamic Permission tracking
     var hasUsageStats by remember { mutableStateOf(PermissionUtils.hasUsageStatsPermission(context)) }
@@ -162,6 +171,7 @@ fun AppManagerScreen(
 
     val selectedApps = processedApps.filter { selectedPackages.contains(it.packageName) }
     val totalSelectedCache = selectedApps.sumOf { it.cacheSize }
+    val totalSelectedData = selectedApps.sumOf { it.dataSize }
     val totalAllVisibleCache = processedApps.sumOf { it.cacheSize }
 
     // Fast scroll visibility detection
@@ -310,14 +320,16 @@ fun AppManagerScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
-                        Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
                                 text = "${selectedApps.size} apps selected",
                                 style = MaterialTheme.typography.labelLarge,
@@ -325,34 +337,73 @@ fun AppManagerScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Cache to clear: ${StorageUtils.formatBytes(totalSelectedCache)}",
+                                text = "Cache: ${StorageUtils.formatBytes(totalSelectedCache)} • Data: ${StorageUtils.formatBytes(totalSelectedData)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = EmeraldSafe
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        Button(
-                            onClick = { viewModel.clearCacheForApps(selectedApps) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = EmeraldSafe,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.testTag("clear_selected_cache_btn")
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CleaningServices,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Clear (${StorageUtils.formatBytes(totalSelectedCache)})",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                            Button(
+                                onClick = { confirmationDialog = AppClearConfirmation.ClearCacheSelected(selectedApps) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = EmeraldSafe,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("clear_selected_cache_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CleaningServices,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Clear Cache (${StorageUtils.formatBytes(totalSelectedCache)})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+
+                            Button(
+                                onClick = { confirmationDialog = AppClearConfirmation.ClearDataSelected(selectedApps) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = RoseSensitive,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(20.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("clear_selected_data_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Clear Data (${StorageUtils.formatBytes(totalSelectedData)})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
@@ -624,7 +675,7 @@ fun AppManagerScreen(
                             )
 
                             Button(
-                                onClick = { viewModel.clearCacheForApps(processedApps) },
+                                onClick = { confirmationDialog = AppClearConfirmation.ClearCacheSelected(processedApps) },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -679,7 +730,8 @@ fun AppManagerScreen(
                                 appInfo = appInfo,
                                 isSelected = isSelected,
                                 onToggleSelect = { viewModel.toggleAppSelection(appInfo.packageName) },
-                                onClearCache = { viewModel.clearCacheForSingleApp(appInfo) },
+                                onClearCache = { confirmationDialog = AppClearConfirmation.ClearCacheSingle(appInfo) },
+                                onClearData = { confirmationDialog = AppClearConfirmation.ClearDataSingle(appInfo) },
                                 onOpenSettings = {
                                     try {
                                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -707,6 +759,122 @@ fun AppManagerScreen(
                     }
                 }
             }
+
+            // Confirmation Dialog for all Clear requests
+            confirmationDialog?.let { dialog ->
+                AlertDialog(
+                    onDismissRequest = { confirmationDialog = null },
+                    icon = {
+                        Icon(
+                            imageVector = when (dialog) {
+                                is AppClearConfirmation.ClearDataSingle, is AppClearConfirmation.ClearDataSelected -> Icons.Default.Warning
+                                else -> Icons.Default.CleaningServices
+                            },
+                            contentDescription = null,
+                            tint = when (dialog) {
+                                is AppClearConfirmation.ClearDataSingle, is AppClearConfirmation.ClearDataSelected -> RoseSensitive
+                                else -> EmeraldSafe
+                            },
+                            modifier = Modifier.size(28.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = when (dialog) {
+                                is AppClearConfirmation.ClearCacheSingle -> "Clear Cache for ${dialog.app.appName}?"
+                                is AppClearConfirmation.ClearDataSingle -> "⚠️ Clear All Data for ${dialog.app.appName}?"
+                                is AppClearConfirmation.ClearCacheSelected -> "Clear Cache for ${dialog.apps.size} Apps?"
+                                is AppClearConfirmation.ClearDataSelected -> "⚠️ Clear Data for ${dialog.apps.size} Apps?"
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = when (dialog) {
+                                is AppClearConfirmation.ClearCacheSingle ->
+                                    "This will delete ${StorageUtils.formatBytes(dialog.app.cacheSize)} of temporary cache files for ${dialog.app.appName}. Cache can be safely regenerated by the application when needed without affecting your accounts or login sessions."
+                                is AppClearConfirmation.ClearDataSingle ->
+                                    "WARNING: Clearing all data (${StorageUtils.formatBytes(dialog.app.dataSize)}) will permanently delete databases, accounts, login sessions, and custom preferences for ${dialog.app.appName}. Android settings will open for you to confirm data clearing safely."
+                                is AppClearConfirmation.ClearCacheSelected ->
+                                    "This will clear approximately ${StorageUtils.formatBytes(dialog.apps.sumOf { it.cacheSize })} of cached files across ${dialog.apps.size} selected applications. Your accounts, saved games, and settings will remain untouched."
+                                is AppClearConfirmation.ClearDataSelected ->
+                                    "WARNING: This will permanently reset data (${StorageUtils.formatBytes(dialog.apps.sumOf { it.dataSize })}) across ${dialog.apps.size} selected applications. All accounts and settings will be removed. Android settings will guide you to clear each app's storage."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val current = dialog
+                                confirmationDialog = null
+                                when (current) {
+                                    is AppClearConfirmation.ClearCacheSingle -> {
+                                        viewModel.clearCacheForSingleApp(current.app)
+                                    }
+                                    is AppClearConfirmation.ClearCacheSelected -> {
+                                        viewModel.clearCacheForApps(current.apps)
+                                    }
+                                    is AppClearConfirmation.ClearDataSingle -> {
+                                        viewModel.clearDataForSingleApp(current.app)
+                                        try {
+                                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                data = Uri.fromParts("package", current.app.packageName, null)
+                                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            // ignore
+                                        }
+                                    }
+                                    is AppClearConfirmation.ClearDataSelected -> {
+                                        viewModel.clearDataForApps(current.apps)
+                                        current.apps.firstOrNull()?.let { firstApp ->
+                                            try {
+                                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                                    data = Uri.fromParts("package", firstApp.packageName, null)
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                // ignore
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = when (dialog) {
+                                    is AppClearConfirmation.ClearDataSingle, is AppClearConfirmation.ClearDataSelected -> RoseSensitive
+                                    else -> EmeraldSafe
+                                },
+                                contentColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("btn_confirm_clear_action")
+                        ) {
+                            Text(
+                                text = when (dialog) {
+                                    is AppClearConfirmation.ClearDataSingle -> "Open Storage Settings"
+                                    is AppClearConfirmation.ClearDataSelected -> "Proceed to Storage"
+                                    else -> "Clear Cache"
+                                },
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { confirmationDialog = null },
+                            modifier = Modifier.testTag("btn_cancel_clear_action")
+                        ) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -717,6 +885,7 @@ fun AppInfoCard(
     isSelected: Boolean,
     onToggleSelect: () -> Unit,
     onClearCache: () -> Unit,
+    onClearData: () -> Unit,
     onOpenSettings: () -> Unit,
     onUninstall: () -> Unit
 ) {
@@ -867,7 +1036,7 @@ fun AppInfoCard(
                         contentColor = Color.White
                     ),
                     shape = RoundedCornerShape(20.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     modifier = Modifier.testTag("app_clear_cache_btn_${appInfo.packageName}")
                 ) {
                     Icon(
@@ -878,10 +1047,35 @@ fun AppInfoCard(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Clear Cache (${StorageUtils.formatBytes(appInfo.cacheSize)})",
+                        text = "Cache (${StorageUtils.formatBytes(appInfo.cacheSize)})",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Clear Data button
+                OutlinedButton(
+                    onClick = onClearData,
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, RoseSensitive.copy(alpha = 0.7f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.testTag("app_clear_data_btn_${appInfo.packageName}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = RoseSensitive
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Clear Data",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = RoseSensitive
                     )
                 }
 
@@ -901,19 +1095,18 @@ fun AppInfoCard(
 
                 if (!appInfo.isProtected) {
                     Spacer(modifier = Modifier.width(6.dp))
-                    Button(
+                    IconButton(
                         onClick = onUninstall,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RoseSensitive,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("app_uninstall_btn_${appInfo.packageName}")
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("app_uninstall_btn_${appInfo.packageName}")
                     ) {
-                        Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(text = "Uninstall", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Uninstall",
+                            modifier = Modifier.size(16.dp),
+                            tint = RoseSensitive
+                        )
                     }
                 }
             }

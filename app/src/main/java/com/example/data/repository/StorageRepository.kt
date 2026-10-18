@@ -125,8 +125,11 @@ class StorageRepository(
                     }
                 }
             } else if (current.isFile) {
-                scannedCount++
                 val fileLen = current.length()
+                if (fileLen <= 0L) {
+                    continue
+                }
+                scannedCount++
                 val lastMod = current.lastModified()
                 scannedBytes += fileLen
 

@@ -122,6 +122,16 @@ class ClearAppCacheUseCase(private val appRepository: AppRepository) {
     }
 }
 
+class ClearAppDataUseCase(private val appRepository: AppRepository) {
+    suspend fun clearSingle(packageName: String): Long {
+        return appRepository.clearAppData(packageName)
+    }
+
+    suspend fun clearMultiple(packageNames: List<String>): Long {
+        return appRepository.clearMultipleAppsData(packageNames)
+    }
+}
+
 class RecycleBinUseCases(private val recycleBinRepository: RecycleBinRepository) {
     val recycledItemsFlow: Flow<List<RecycledItem>> = recycleBinRepository.recycledItemsFlow
     val totalRecycledSizeFlow: Flow<Long> = recycleBinRepository.totalRecycledSizeFlow
